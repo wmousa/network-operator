@@ -56,6 +56,26 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+func setupWebhookControllers(mgr ctrl.Manager) error {
+	if err := (&mellanoxcomv1alpha1.MacvlanNetwork{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "MacvlanNetwork")
+		return err
+	}
+	if err := (&mellanoxcomv1alpha1.HostDeviceNetwork{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HostDeviceNetwork")
+		return err
+	}
+	if err := (&mellanoxcomv1alpha1.NicClusterPolicy{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "NicClusterPolicy")
+		return err
+	}
+	if err := (&mellanoxcomv1alpha1.IPoIBNetwork{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "IPoIBNetwork")
+		return err
+	}
+	return nil
+}
+
 func setupCRDControllers(mgr ctrl.Manager) error {
 	ctrLog := setupLog.WithName("controller")
 	if err := (&controllers.NicClusterPolicyReconciler{
@@ -165,6 +185,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Upgrade")
 		os.Exit(1)
 	}
+
+	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		if err := setupWebhookControllers(mgr); err != nil {
+			os.Exit(1)
+		}
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {

@@ -1,0 +1,173 @@
+---
+{{- if .Values.admissionController.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-webhook-service
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9443
+  selector:
+    control-plane: controller-manager
+{{- end }}
+---
+{{- if .Values.admissionController.useCertManager }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/created-by: {{ .Release.Name }}
+    app.kubernetes.io/instance: serving-cert
+    app.kubernetes.io/name: certificate
+    app.kubernetes.io/part-of: {{ .Release.Name }}
+  name: {{ .Release.Name }}-serving-cert
+  namespace: {{ .Release.Namespace }}
+spec:
+  dnsNames:
+  - {{ .Release.Name }}-webhook-service.{{ .Release.Namespace }}.svc
+  - {{ .Release.Name }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ .Release.Name }}-selfsigned-issuer
+  secretName: webhook-server-cert
+{{- end }}
+---
+{{- if .Values.admissionController.useCertManager }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  labels:
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/created-by: {{ .Release.Name }}
+    app.kubernetes.io/instance: serving-cert
+    app.kubernetes.io/name: certificate
+    app.kubernetes.io/part-of: {{ .Release.Name }}
+  name: {{ .Release.Name }}-selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+{{- end }}
+---
+{{- if .Values.admissionController.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ .Release.Name }}-serving-cert
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/created-by: {{ .Release.Name }}
+    app.kubernetes.io/instance: validating-webhook-configuration
+    app.kubernetes.io/name: validatingwebhookconfiguration
+    app.kubernetes.io/part-of: {{ .Release.Name }}
+  name: {{ .Release.Name }}-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Release.Name }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-mellanox-com-v1alpha1-hostdevicenetwork
+    {{- if not .Values.admissionController.useCertManager }}
+    caBundle: {{ .Values.admissionController.certificate.tlsCrt | b64enc | quote }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vhostdevicenetwork.kb.io
+  rules:
+  - apiGroups:
+    - mellanox.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - hostdevicenetworks
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Release.Name }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-mellanox-com-v1alpha1-ipoibnetwork
+    {{- if not .Values.admissionController.useCertManager }}
+    caBundle: {{ .Values.admissionController.certificate.tlsCrt | b64enc | quote }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vipoibnetwork.kb.io
+  rules:
+  - apiGroups:
+    - mellanox.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ipoibnetworks
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Release.Name }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-mellanox-com-v1alpha1-macvlannetwork
+    {{- if not .Values.admissionController.useCertManager }}
+    caBundle: {{ .Values.admissionController.certificate.tlsCrt | b64enc | quote }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vmacvlannetwork.kb.io
+  rules:
+  - apiGroups:
+    - mellanox.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - macvlannetworks
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ .Release.Name }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-mellanox-com-v1alpha1-nicclusterpolicy
+    {{- if not .Values.admissionController.useCertManager }}
+    caBundle: {{ .Values.admissionController.certificate.tlsCrt | b64enc | quote }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vnicclusterpolicy.kb.io
+  rules:
+  - apiGroups:
+    - mellanox.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - nicclusterpolicies
+  sideEffects: None
+{{- end }}
+---
+{{- if and .Values.admissionController.enabled (not .Values.admissionController.useCertManager) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webhook-server-cert
+  namespcace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  tls.crt: {{ .Values.admissionController.certificate.tlsCrt | b64enc | quote }}
+  tls.key: {{ .Values.admissionController.certificate.tlsKey | b64enc | quote }}
+{{- end }}

@@ -19,6 +19,9 @@ metadata:
   name: {{ include "network-operator.fullname" . }}
   labels:
     {{- include "network-operator.labels" . | nindent 4 }}
+    {{- if .Values.admissionController.enabled }}
+    control-plane: controller-manager
+    {{- end }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
@@ -27,8 +30,15 @@ spec:
       {{- include "network-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- if .Values.admissionController.enabled }}
+      annotations:
+        kubectl.kubernetes.io/default-container: {{ .Chart.Name }}
+      {{- end }}
       labels:
         nvidia.com/ofed-driver-upgrade-drain.skip: "true"
+        {{- if .Values.admissionController.enabled }}
+        control-plane: controller-manager
+        {{- end }}
         {{- include "network-operator.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.operator.nodeSelector }}
@@ -46,9 +56,38 @@ spec:
       serviceAccountName: {{ include "network-operator.fullname" . }}
       imagePullSecrets: {{ include "network-operator.operator.imagePullSecrets" . }}
       containers:
+        {{- if .Values.admissionController.enabled }}
+        - name: kube-rbac-proxy
+          args:
+          - --secure-listen-address=0.0.0.0:8443
+          - --upstream=http://127.0.0.1:8080/
+          - --logtostderr=true
+          - --v=0
+          image: gcr.io/kubebuilder/kube-rbac-proxy@sha256:db06cc4c084dd0253134f156dddaaf53ef1c3fb3cc809e5d81711baa4029ea4c
+          ports:
+          - containerPort: 8443
+            name: https
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 64Mi
+        {{- end }}
         - name: {{ .Chart.Name }}
           # Replace this with the built image name
           image: "{{ .Values.operator.repository }}/{{ .Values.operator.image }}:{{ .Values.operator.tag | default .Chart.AppVersion }}"
+          {{- if .Values.admissionController.enabled }}
+          ports:
+          - containerPort: 9443
+            name: webhook-server
+            protocol: TCP
+          volumeMounts:
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+          {{- end }}
           command:
           - /manager
           imagePullPolicy: IfNotPresent
@@ -67,3 +106,15 @@ spec:
                   fieldPath: metadata.namespace
             - name: OPERATOR_NAME
               value: "network-operator"
+            - name: ENABLE_WEBHOOKS
+              value: "{{ .Values.admissionController.enabled }}"
+      {{- if .Values.admissionController.enabled }}
+      securityContext:
+        runAsUser: 65532
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
+      {{- end }}

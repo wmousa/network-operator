@@ -16,6 +16,20 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+admissionController:
+  enabled: false
+  useCertManager: false
+  certificate:
+    tlsCrt: |
+      -----BEGIN CERTIFICATE-----
+      MIIMIICLDCCAdKgAwIBAgIBADAKBggqhkjOPQQDAjB9MQswCQYDVQQGEwJCRTEPMA0G
+      ...
+      -----END CERTIFICATE-----
+    tlsKey: |
+      -----BEGIN EC PRIVATE KEY-----
+      MHcl4wOuDwKQa+upc8GftXE2C//4mKANBC6It01gUaTIpo=
+      ...
+      -----END EC PRIVATE KEY-----
 nfd:
   enabled: true
   deployNodeFeatureRules: true

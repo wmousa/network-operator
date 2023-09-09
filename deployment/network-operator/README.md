@@ -101,34 +101,41 @@ $ kubectl -n network-operator get pods
 By default the network operator
 deploys [Node Feature Discovery (NFD)](https://github.com/kubernetes-sigs/node-feature-discovery)
 in order to perform node labeling in the cluster to allow proper scheduling of Network Operator resources. If the nodes
-where already labeled by other means (either deployed from upstream or deployed within another deployment), it is possible to disable the deployment of NFD by setting
-`nfd.enabled=false` chart parameter and make sure that the installed version is `v0.13.2` or newer and has NodeFeatureApi enabled.
+where already labeled by other means (either deployed from upstream or deployed within another deployment), it is
+possible to disable the deployment of NFD by setting
+`nfd.enabled=false` chart parameter and make sure that the installed version is `v0.13.2` or newer and has
+NodeFeatureApi enabled.
 
 ##### Deploy NFD from upstream with NodeFeatureApi enabled
+
 ```
 $ export NFD_NS=node-feature-discovery
 $ helm repo add nfd https://kubernetes-sigs.github.io/node-feature-discovery/charts
 $ helm repo update
 $ helm install nfd/node-feature-discovery --namespace $NFD_NS --create-namespace --generate-name --set enableNodeFeatureApi='true'
 ```
-For additional information , refer to the official [NVD deployment with Helm](https://kubernetes-sigs.github.io/node-feature-discovery/v0.13/deployment/helm.html)
+
+For additional information , refer to the
+official [NVD deployment with Helm](https://kubernetes-sigs.github.io/node-feature-discovery/v0.13/deployment/helm.html)
 
 ##### Deploy Network Operator without Node Feature Discovery
+
 ```
 $ helm install --set nfd.enabled=false -n network-operator --create-namespace --wait network-operator mellanox/network-operator
 ```
 
 ##### Currently the following NFD labels are used:
 
-| Label | Where |
-| ----- | ----- |
+| Label                                         | Where                                             |
+|-----------------------------------------------|---------------------------------------------------|
 | `feature.node.kubernetes.io/pci-15b3.present` | Nodes bearing Nvidia Mellanox Networking hardware |
-| `nvidia.com/gpu.present` | Nodes bearing Nvidia GPU hardware |
+| `nvidia.com/gpu.present`                      | Nodes bearing Nvidia GPU hardware                 |
 
 > __Note:__ The labels which Network Operator depends on may change between releases.
 
 > __Note:__ By default the operator is deployed without an instance of `NicClusterPolicy` and `MacvlanNetwork`
-custom resources. The user is required to create it later with configuration matching the cluster or use chart parameters to deploy it together with the operator.
+> custom resources. The user is required to create it later with configuration matching the cluster or use chart
+> parameters to deploy it together with the operator.
 
 #### Deploy development version of Network Operator
 
@@ -148,6 +155,37 @@ $ helm install -n network-operator --create-namespace --wait network-operator ./
 # View deployed resources
 $ kubectl -n network-operator get pods
 ```
+
+#### Deploy Network Operator with Admission Controller
+
+Admission controller is optionally deployed as a part of Network Operator installation.
+It's able to validate supported CRDs: NicClusterPolicy, HostDeviceNetwork, MacvlanNetwork, and IpoibNetwork
+Deploying with admission controller is disabled by default and in order to enable it, you need to
+set `admissionController.enabled`
+to `true`.
+By enabling admission controller, you either use `cert-manager`
+for generating self-signed certificate or by providing a self-signed certificate by yourself
+In order to use `cert-manager`, you need to set `admissionController.useCertManager` to `true` and to
+deploy [cert-manager](https://cert-manager.io/docs/installation/) before deploying Network Operator
+If you don't want to use `cert-manager`, set `admissionController.useCertManager` to `false` and provide your own
+certificate and key to `admissionController.certificate.tlsCrt` and `admissionController.certificate.tlsKey`
+> __NOTE__: When using your own certificate, the certificate must be valid for <Release_Name>-webhook-service.<
+> Release_Namespace>.svc, e.g. network-operator-webhook-service.network-operator.svc
+
+##### Generating self-signed certificate using OpenSSL
+
+To generate a self-signed SSL certificate valid for a specific hostname, you can use the `openssl` command-line tool.
+First, navigate to the directory where you want to store your certificate and key files. Then, run the following
+command:
+
+```bash
+HOSTNMAE="network-operator-webhook-service.network-operator.svc"
+openssl req -x509 -nodes -batch -newkey rsa:2048 -keyout server.key -out server.crt -days 365 -addext "subjectAltName=DNS:$HOSTNMAE"
+```
+
+Replace `HOSTNMAE` with the hostname follows this convention <Release_Name>-webhook-service.<Release_Namespace>.svc.
+This command will generate a new RSA key pair with 2048 bits and create a self-signed certificate (`server.crt`) and
+private key (`server.key`) that are valid for 365 days.
 
 ## Helm Tests
 
@@ -174,11 +212,12 @@ Notes:
 
 ## Upgrade
 
-> __NOTE__: Upgrade capabilities are limited now. Additional manual actions required when containerized OFED driver is used
+> __NOTE__: Upgrade capabilities are limited now. Additional manual actions required when containerized OFED driver is
+> used
 
 Before starting the upgrade to a specific release version, please, check release notes for this version to ensure that
-no additional actions are required.
 
+no additional actions are required.
 
 ### Check available releases
 
@@ -192,7 +231,7 @@ helm search repo mellanox/network-operator -l
 
 The network-operator helm chart contains a hook(pre-install, pre-upgrade)
 that will automatically upgrade required CRDs in the cluster.
-The hook is enabled by default. If you don't want to upgrade CRDs with helm automatically, 
+The hook is enabled by default. If you don't want to upgrade CRDs with helm automatically,
 you can disable auto upgrade by setting `upgradeCRDs: false` in the helm chart values.
 Then you can follow the guide below to download and apply CRDs for the concrete version of the network-operator.
 
@@ -344,6 +383,10 @@ parameters.
 
 | Name                                                 | Type   | Default                                  | description                                                                                                                                                 |
 |------------------------------------------------------|--------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `admissionController.enabled`                        | bool   | `False`                                  | deploy with admission controller webhook                                                                                                                    |
+| `admissionController.useCertManager`                 | bool   | `False`                                  | use cert-manager for generating self-signed certificate                                                                                                     |
+| `admissionController.certificate.tlsCrt`             | string | ``                                       | External certificate crt                                                                                                                                    |
+| `admissionController.certificate.tlsKey`             | string | ``                                       | External certificate key                                                                                                                                    |
 | `nfd.enabled`                                        | bool   | `True`                                   | deploy Node Feature Discovery                                                                                                                               |
 | `nfd.deployNodeFeatureRules`                         | bool   | `True`                                   | deploy Node Feature Rules to label the nodes                                                                                                                |
 | `sriovNetworkOperator.enabled`                       | bool   | `False`                                  | deploy SR-IOV Network Operator                                                                                                                              |
@@ -373,34 +416,34 @@ imagePullSecrets:
 
 #### Mellanox OFED driver
 
-| Name | Type | Default | description                                                                                                                                                               |
-| ---- | ---- | ------- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ofedDriver.deploy` | bool | `false` | deploy Mellanox OFED driver container                                                                                                                                     |
-| `ofedDriver.repository` | string | `mellanox` | Mellanox OFED driver image repository                                                                                                                                     |
-| `ofedDriver.image` | string | `mofed` | Mellanox OFED driver image name                                                                                                                                           |
-| `ofedDriver.version` | string | `5.9-0.5.6.0` | Mellanox OFED driver version                                                                                                                                              |
-| `ofedDriver.imagePullSecrets` | list | `[]` | An optional list of references to secrets to use for pulling any of the Mellanox OFED driver image                                                                        |
-| `ofedDriver.env` | list | `[]` | An optional list of [environment variables](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#envvar-v1-core) passed to the Mellanox OFED driver image |
-| `ofedDriver.repoConfig.name` | string | `` | Private mirror repository configuration configMap name |
-| `ofedDriver.certConfig.name` | string | `` | Custom TLS key/certificate configuration configMap name |
-| `ofedDriver.terminationGracePeriodSeconds` | int | 300 | Mellanox OFED termination grace periods in seconds|
-| `ofedDriver.startupProbe.initialDelaySeconds` | int | 10 | Mellanox OFED startup probe initial delay                                                                                                                                 |
-| `ofedDriver.startupProbe.periodSeconds` | int | 20 | Mellanox OFED startup probe interval                                                                                                                                      |
-| `ofedDriver.livenessProbe.initialDelaySeconds` | int | 30 | Mellanox OFED liveness probe initial delay                                                                                                                                |
-| `ofedDriver.livenessProbe.periodSeconds` | int | 30 | Mellanox OFED liveness probe interval                                                                                                                                     |
-| `ofedDriver.readinessProbe.initialDelaySeconds` | int | 10 | Mellanox OFED readiness probe initial delay                                                                                                                               |
-| `ofedDriver.readinessProbe.periodSeconds` | int | 30 | Mellanox OFED readiness probe interval                                                                                                                                    |
+| Name                                            | Type   | Default       | description                                                                                                                                                               |
+|-------------------------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ofedDriver.deploy`                             | bool   | `false`       | deploy Mellanox OFED driver container                                                                                                                                     |
+| `ofedDriver.repository`                         | string | `mellanox`    | Mellanox OFED driver image repository                                                                                                                                     |
+| `ofedDriver.image`                              | string | `mofed`       | Mellanox OFED driver image name                                                                                                                                           |
+| `ofedDriver.version`                            | string | `5.9-0.5.6.0` | Mellanox OFED driver version                                                                                                                                              |
+| `ofedDriver.imagePullSecrets`                   | list   | `[]`          | An optional list of references to secrets to use for pulling any of the Mellanox OFED driver image                                                                        |
+| `ofedDriver.env`                                | list   | `[]`          | An optional list of [environment variables](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#envvar-v1-core) passed to the Mellanox OFED driver image |
+| `ofedDriver.repoConfig.name`                    | string | ``            | Private mirror repository configuration configMap name                                                                                                                    |
+| `ofedDriver.certConfig.name`                    | string | ``            | Custom TLS key/certificate configuration configMap name                                                                                                                   |
+| `ofedDriver.terminationGracePeriodSeconds`      | int    | 300           | Mellanox OFED termination grace periods in seconds                                                                                                                        |
+| `ofedDriver.startupProbe.initialDelaySeconds`   | int    | 10            | Mellanox OFED startup probe initial delay                                                                                                                                 |
+| `ofedDriver.startupProbe.periodSeconds`         | int    | 20            | Mellanox OFED startup probe interval                                                                                                                                      |
+| `ofedDriver.livenessProbe.initialDelaySeconds`  | int    | 30            | Mellanox OFED liveness probe initial delay                                                                                                                                |
+| `ofedDriver.livenessProbe.periodSeconds`        | int    | 30            | Mellanox OFED liveness probe interval                                                                                                                                     |
+| `ofedDriver.readinessProbe.initialDelaySeconds` | int    | 10            | Mellanox OFED readiness probe initial delay                                                                                                                               |
+| `ofedDriver.readinessProbe.periodSeconds`       | int    | 30            | Mellanox OFED readiness probe interval                                                                                                                                    |
 
 #### RDMA Device Plugin
 
-| Name | Type | Default | description |
-| ---- | ---- | ------- | ----------- |
-| `rdmaSharedDevicePlugin.deploy` | bool | `true` | Deploy RDMA Shared device plugin  |
-| `rdmaSharedDevicePlugin.repository` | string | `nvcr.io/nvidia/cloud-native` | RDMA Shared device plugin image repository |
-| `rdmaSharedDevicePlugin.image` | string | `k8s-rdma-shared-dev-plugin` | RDMA Shared device plugin image name  |
-| `rdmaSharedDevicePlugin.version` | string | `v1.3.2` | RDMA Shared device plugin version  |
-| `rdmaSharedDevicePlugin.imagePullSecrets` | list | `[]` | An optional list of references to secrets to use for pulling any of the RDMA Shared device plugin image |
-| `rdmaSharedDevicePlugin.resources` | list | See below | RDMA Shared device plugin resources |
+| Name                                      | Type   | Default                       | description                                                                                             |
+|-------------------------------------------|--------|-------------------------------|---------------------------------------------------------------------------------------------------------|
+| `rdmaSharedDevicePlugin.deploy`           | bool   | `true`                        | Deploy RDMA Shared device plugin                                                                        |
+| `rdmaSharedDevicePlugin.repository`       | string | `nvcr.io/nvidia/cloud-native` | RDMA Shared device plugin image repository                                                              |
+| `rdmaSharedDevicePlugin.image`            | string | `k8s-rdma-shared-dev-plugin`  | RDMA Shared device plugin image name                                                                    |
+| `rdmaSharedDevicePlugin.version`          | string | `v1.3.2`                      | RDMA Shared device plugin version                                                                       |
+| `rdmaSharedDevicePlugin.imagePullSecrets` | list   | `[]`                          | An optional list of references to secrets to use for pulling any of the RDMA Shared device plugin image |
+| `rdmaSharedDevicePlugin.resources`        | list   | See below                     | RDMA Shared device plugin resources                                                                     |
 
 ##### RDMA Device Plugin Resource configurations
 
@@ -425,14 +468,14 @@ resources:
 
 #### SR-IOV Network Device plugin
 
-| Name | Type | Default | description |
-| ---- | ---- | ------- | ----------- |
-| `sriovDevicePlugin.deploy` | bool | `false` | Deploy SR-IOV Network device plugin  |
-| `sriovDevicePlugin.repository` | string | `ghcr.io/k8snetworkplumbingwg` | SR-IOV Network device plugin image repository |
-| `sriovDevicePlugin.image` | string | `sriov-network-device-plugin` | SR-IOV Network device plugin image name  |
-| `sriovDevicePlugin.version` | string | `v3.5.1` | SR-IOV Network device plugin version  |
-| `sriovDevicePlugin.imagePullSecrets` | list | `[]` | An optional list of references to secrets to use for pulling any of the SR-IOV Network device plugin image |
-| `sriovDevicePlugin.resources` | list | See below | SR-IOV Network device plugin resources |
+| Name                                 | Type   | Default                        | description                                                                                                |
+|--------------------------------------|--------|--------------------------------|------------------------------------------------------------------------------------------------------------|
+| `sriovDevicePlugin.deploy`           | bool   | `false`                        | Deploy SR-IOV Network device plugin                                                                        |
+| `sriovDevicePlugin.repository`       | string | `ghcr.io/k8snetworkplumbingwg` | SR-IOV Network device plugin image repository                                                              |
+| `sriovDevicePlugin.image`            | string | `sriov-network-device-plugin`  | SR-IOV Network device plugin image name                                                                    |
+| `sriovDevicePlugin.version`          | string | `v3.5.1`                       | SR-IOV Network device plugin version                                                                       |
+| `sriovDevicePlugin.imagePullSecrets` | list   | `[]`                           | An optional list of references to secrets to use for pulling any of the SR-IOV Network device plugin image |
+| `sriovDevicePlugin.resources`        | list   | See below                      | SR-IOV Network device plugin resources                                                                     |
 
 ##### SR-IOV Network Device Plugin Resource configurations
 
@@ -454,7 +497,8 @@ resources:
       drivers: [mlx5_ib]
 ``` 
 
-> __Note__: The parameter listed are non-exhaustive, for the full list of chart parameters refer to the file: `values.yaml`
+> __Note__: The parameter listed are non-exhaustive, for the full list of chart parameters refer to the
+> file: `values.yaml`
 
 #### IB-Kubernetes
 
@@ -497,13 +541,14 @@ data:
   UFM_CERTIFICATE: ""
 ``` 
 
-> __Note__: InfiniBand Fabric manages a single pool of GUIDs. In order to use IB Kubernetes in different clusters, different GUID ranges must be specified to avoid collisions.
+> __Note__: InfiniBand Fabric manages a single pool of GUIDs. In order to use IB Kubernetes in different clusters,
+> different GUID ranges must be specified to avoid collisions.
 
 #### Secondary Network
 
-| Name | Type | Default | description |
-| ---- | ---- | ------- | ----------- |
-| `secondaryNetwork.deploy` | bool | `true` | Deploy Secondary Network  |
+| Name                      | Type | Default | description              |
+|---------------------------|------|---------|--------------------------|
+| `secondaryNetwork.deploy` | bool | `true`  | Deploy Secondary Network |
 
 Specifies components to deploy in order to facilitate a secondary network in Kubernetes. It consists of the following
 optionally deployed components:
@@ -515,55 +560,55 @@ optionally deployed components:
 
 ##### CNI Plugin Secondary Network
 
-| Name | Type | Default | description |
-| ---- | ---- | ------- | ----------- |
-| `cniPlugins.deploy` | bool | `true` | Deploy CNI Plugins Secondary Network  |
-| `cniPlugins.image` | string | `plugins` | CNI Plugins image name  |
-| `cniPlugins.repository` | string | `ghcr.io/k8snetworkplumbingwg` | CNI Plugins image repository  |
-| `cniPlugins.version` | string | `v0.8.7-amd64` | CNI Plugins image version  |
-| `cniPlugins.imagePullSecrets` | list | `[]` | An optional list of references to secrets to use for pulling any of the CNI Plugins image |
+| Name                          | Type   | Default                        | description                                                                               |
+|-------------------------------|--------|--------------------------------|-------------------------------------------------------------------------------------------|
+| `cniPlugins.deploy`           | bool   | `true`                         | Deploy CNI Plugins Secondary Network                                                      |
+| `cniPlugins.image`            | string | `plugins`                      | CNI Plugins image name                                                                    |
+| `cniPlugins.repository`       | string | `ghcr.io/k8snetworkplumbingwg` | CNI Plugins image repository                                                              |
+| `cniPlugins.version`          | string | `v0.8.7-amd64`                 | CNI Plugins image version                                                                 |
+| `cniPlugins.imagePullSecrets` | list   | `[]`                           | An optional list of references to secrets to use for pulling any of the CNI Plugins image |
 
 ##### Multus CNI Secondary Network
 
-| Name | Type | Default | description |
-| ---- | ---- | ------- | ----------- |
-| `multus.deploy` | bool | `true` | Deploy Multus Secondary Network  |
-| `multus.image` | string | `multus-cni` | Multus image name  |
-| `multus.repository` | string | `ghcr.io/k8snetworkplumbingwg` | Multus image repository  |
-| `multus.version` | string | `v3.8` | Multus image version  |
-| `multus.imagePullSecrets` | list | `[]` | An optional list of references to secrets to use for pulling any of the Multus image |
-| `multus.config` | string | nil | Multus CNI config, if not specified or empty then config will be automatically generated from the CNI configuration file of the master plugin (the first file in lexicographical order in cni-conf-dir)  |
+| Name                      | Type   | Default                        | description                                                                                                                                                                                             |
+|---------------------------|--------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `multus.deploy`           | bool   | `true`                         | Deploy Multus Secondary Network                                                                                                                                                                         |
+| `multus.image`            | string | `multus-cni`                   | Multus image name                                                                                                                                                                                       |
+| `multus.repository`       | string | `ghcr.io/k8snetworkplumbingwg` | Multus image repository                                                                                                                                                                                 |
+| `multus.version`          | string | `v3.8`                         | Multus image version                                                                                                                                                                                    |
+| `multus.imagePullSecrets` | list   | `[]`                           | An optional list of references to secrets to use for pulling any of the Multus image                                                                                                                    |
+| `multus.config`           | string | nil                            | Multus CNI config, if not specified or empty then config will be automatically generated from the CNI configuration file of the master plugin (the first file in lexicographical order in cni-conf-dir) |
 
 ##### IPoIB CNI
 
-| Name | Type | Default | description |
-| ---- | ---- | ------- | ----------- |
-| `ipoib.deploy` | bool | `false` | Deploy IPoIB CNI  |
-| `ipoib.image` | string | `ipoib-cni` | IPoIB CNI image name  |
-| `ipoib.repository` | string | `nvcr.io/nvidia/cloud-native` | IPoIB CNI image repository  |
-| `ipoib.version` | string | `v1.1.0` | IPoIB CNI image version  |
-| `ipoib.imagePullSecrets` | list | `[]` | An optional list of references to secrets to use for pulling any of the IPoIB CNI image |
+| Name                     | Type   | Default                       | description                                                                             |
+|--------------------------|--------|-------------------------------|-----------------------------------------------------------------------------------------|
+| `ipoib.deploy`           | bool   | `false`                       | Deploy IPoIB CNI                                                                        |
+| `ipoib.image`            | string | `ipoib-cni`                   | IPoIB CNI image name                                                                    |
+| `ipoib.repository`       | string | `nvcr.io/nvidia/cloud-native` | IPoIB CNI image repository                                                              |
+| `ipoib.version`          | string | `v1.1.0`                      | IPoIB CNI image version                                                                 |
+| `ipoib.imagePullSecrets` | list   | `[]`                          | An optional list of references to secrets to use for pulling any of the IPoIB CNI image |
 
 ##### IPAM CNI Plugin Secondary Network
 
-| Name                          | Type   | Default                        | description |
-| ----------------------------- | ------ |--------------------------------| ----------- |
-| `ipamPlugin.deploy`           | bool   | `true`                         | Deploy IPAM CNI Plugin Secondary Network  |
-| `ipamPlugin.image`            | string | `whereabouts`                  | IPAM CNI Plugin image name  |
-| `ipamPlugin.repository`       | string | `ghcr.io/k8snetworkplumbingwg` | IPAM CNI Plugin image repository  |
-| `ipamPlugin.version`          | string | `v0.5.4-amd64`                 | IPAM CNI Plugin image version  |
+| Name                          | Type   | Default                        | description                                                                                   |
+|-------------------------------|--------|--------------------------------|-----------------------------------------------------------------------------------------------|
+| `ipamPlugin.deploy`           | bool   | `true`                         | Deploy IPAM CNI Plugin Secondary Network                                                      |
+| `ipamPlugin.image`            | string | `whereabouts`                  | IPAM CNI Plugin image name                                                                    |
+| `ipamPlugin.repository`       | string | `ghcr.io/k8snetworkplumbingwg` | IPAM CNI Plugin image repository                                                              |
+| `ipamPlugin.version`          | string | `v0.5.4-amd64`                 | IPAM CNI Plugin image version                                                                 |
 | `ipamPlugin.imagePullSecrets` | list   | `[]`                           | An optional list of references to secrets to use for pulling any of the IPAM CNI Plugin image |
 
 #### NVIDIA IPAM Plugin
 
-| Name                      | Type   | Default            | description                                                                              |
-| ------------------------- | ------ |--------------------| -----------------------------------------------------------------------------------------|
-| `nvIpam.deploy`           | bool   | `false`            | Deploy NVIDIA IPAM Plugin                                                                |
-| `nvIpam.image`            | string | `nvidia-k8s-ipam`  | NVIDIA IPAM Plugin image name                                                            |
-| `nvIpam.repository`       | string | `ghcr.io/mellanox` | NVIDIA IPAM Plugin image repository                                                      |
-| `nvIpam.version`          | string | `v0.0.3`           | NVIDIA IPAM Plugin image version                                                         |
-| `nvIpam.imagePullSecrets` | list   | `[]`               | An optional list of references to secrets to use for pulling any of the Plugin image     |
-| `nvIpam.config`           | string | `"{"pools": {"rdma-pool": {"subnet": "192.168.0.0/16", "perNodeBlockSize": 100, "gateway": "192.168.0.1"}}}"` | Network pool configuration as described in [nvidia-k8s-ipam](https://github.com/Mellanox/nvidia-k8s-ipam), the default defines a single IP Pool named `"rdma-pool"`|
+| Name                      | Type   | Default                                                                                                       | description                                                                                                                                                         |
+|---------------------------|--------|---------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `nvIpam.deploy`           | bool   | `false`                                                                                                       | Deploy NVIDIA IPAM Plugin                                                                                                                                           |
+| `nvIpam.image`            | string | `nvidia-k8s-ipam`                                                                                             | NVIDIA IPAM Plugin image name                                                                                                                                       |
+| `nvIpam.repository`       | string | `ghcr.io/mellanox`                                                                                            | NVIDIA IPAM Plugin image repository                                                                                                                                 |
+| `nvIpam.version`          | string | `v0.0.3`                                                                                                      | NVIDIA IPAM Plugin image version                                                                                                                                    |
+| `nvIpam.imagePullSecrets` | list   | `[]`                                                                                                          | An optional list of references to secrets to use for pulling any of the Plugin image                                                                                |
+| `nvIpam.config`           | string | `"{"pools": {"rdma-pool": {"subnet": "192.168.0.0/16", "perNodeBlockSize": 100, "gateway": "192.168.0.1"}}}"` | Network pool configuration as described in [nvidia-k8s-ipam](https://github.com/Mellanox/nvidia-k8s-ipam), the default defines a single IP Pool named `"rdma-pool"` |
 
 ## Deployment Examples
 
